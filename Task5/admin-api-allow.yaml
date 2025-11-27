@@ -1,0 +1,172 @@
+##############################################################################
+# NetworkPolicy для админского API (административный трафик)
+# PropDevelopment - Network Isolation
+#
+# Назначение: Разрешить трафик между admin-front-end и admin-back-end-api
+# 
+# Разрешенный трафик:
+#   admin-front-end-app ←→ admin-back-end-api-app
+#
+# Запрещенный трафик:
+#   front-end-app ✗→ admin-back-end-api-app
+#   admin-front-end-app ✗→ back-end-api-app (если требуется изоляция)
+#
+# Применение: kubectl apply -f admin-api-allow.yaml
+##############################################################################
+
+---
+# Политика 1: Входящий трафик (Ingress) к admin-back-end-api
+# Разрешаем только подам с role=admin-front-end подключаться к admin API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-api-allow-ingress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: ingress
+    security-level: high
+  annotations:
+    description: "Разрешить входящий трафик к admin API только от admin front-end"
+    created-for: "PropDevelopment admin services isolation"
+    security-note: "Admin API содержит критичные функции: управление пользователями, CRM, настройки системы"
+spec:
+  # Применяется к подам с меткой role=admin-back-end-api
+  podSelector:
+    matchLabels:
+      role: admin-back-end-api
+  
+  # Типы политик
+  policyTypes:
+    - Ingress  # Контролируем входящий трафик
+  
+  # Правила входящего трафика
+  ingress:
+    # Правило 1: Разрешить ТОЛЬКО от admin-front-end
+    - from:
+        # Только от подов с role=admin-front-end
+        - podSelector:
+            matchLabels:
+              role: admin-front-end
+      # На порт 80 (HTTP)
+      ports:
+        - protocol: TCP
+          port: 80
+    
+    # Правило 2: Разрешить от security-admin (для аудита, опционально)
+    # Раскомментируйте, если нужен доступ команде безопасности
+    # - from:
+    #     - podSelector:
+    #         matchLabels:
+    #           role: security-monitor
+    #   ports:
+    #     - protocol: TCP
+    #       port: 80
+
+---
+# Политика 2: Исходящий трафик (Egress) от admin-front-end
+# Разрешаем admin-front-end подключаться только к admin-back-end-api
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-frontend-allow-egress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: egress
+    security-level: high
+  annotations:
+    description: "Разрешить исходящий трафик от admin front-end только к admin API"
+    created-for: "PropDevelopment admin services isolation"
+spec:
+  # Применяется к подам с меткой role=admin-front-end
+  podSelector:
+    matchLabels:
+      role: admin-front-end
+  
+  # Типы политик
+  policyTypes:
+    - Egress  # Контролируем исходящий трафик
+  
+  # Правила исходящего трафика
+  egress:
+    # Правило 1: Разрешить к admin-back-end-api
+    - to:
+        # Только к подам с role=admin-back-end-api
+        - podSelector:
+            matchLabels:
+              role: admin-back-end-api
+      # На порт 80 (HTTP)
+      ports:
+        - protocol: TCP
+          port: 80
+    
+    # Правило 2: Разрешить DNS запросы (необходимо для резолвинга имен)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Правило 3: Разрешить к auth-service для проверки прав (опционально)
+    # Раскомментируйте, если используется отдельный сервис аутентификации
+    # - to:
+    #     - podSelector:
+    #         matchLabels:
+    #           role: auth-service
+    #   ports:
+    #     - protocol: TCP
+    #       port: 8080
+
+---
+# Политика 3: Дополнительная защита - Egress от back-end-api
+# Запрещаем обычному API обращаться к админскому API
+# (Защита от компрометации обычных сервисов)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: non-admin-api-deny-to-admin
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: egress
+    security-level: medium
+  annotations:
+    description: "Запретить обычному API обращаться к админскому API"
+    created-for: "PropDevelopment defense in depth"
+spec:
+  # Применяется к подам с меткой role=back-end-api
+  podSelector:
+    matchLabels:
+      role: back-end-api
+  
+  # Типы политик
+  policyTypes:
+    - Egress
+  
+  # Правила исходящего трафика
+  egress:
+    # Правило 1: Разрешить к базам данных (опционально)
+    # Раскомментируйте и настройте под вашу архитектуру
+    # - to:
+    #     - podSelector:
+    #         matchLabels:
+    #           role: database
+    #   ports:
+    #     - protocol: TCP
+    #       port: 5432  # PostgreSQL
+    
+    # Правило 2: Разрешить DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # ЯВНО НЕ разрешаем к admin-back-end-api
+    # Это создает дополнительный барьер безопасности
+

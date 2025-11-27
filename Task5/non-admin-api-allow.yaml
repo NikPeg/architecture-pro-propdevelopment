@@ -1,0 +1,137 @@
+##############################################################################
+# NetworkPolicy для обычного API (клиентский трафик)
+# PropDevelopment - Network Isolation
+#
+# Назначение: Разрешить трафик между front-end и back-end-api
+# 
+# Разрешенный трафик:
+#   front-end-app ←→ back-end-api-app
+#
+# Запрещенный трафик:
+#   front-end-app ✗→ admin-back-end-api-app
+#   admin-front-end-app ✗→ back-end-api-app
+#
+# Применение: kubectl apply -f non-admin-api-allow.yaml
+##############################################################################
+
+---
+# Политика 1: Входящий трафик (Ingress) к back-end-api
+# Разрешаем только подам с role=front-end подключаться к back-end-api
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: non-admin-api-allow-ingress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: ingress
+  annotations:
+    description: "Разрешить входящий трафик к back-end-api только от front-end"
+    created-for: "PropDevelopment client services isolation"
+spec:
+  # Применяется к подам с меткой role=back-end-api
+  podSelector:
+    matchLabels:
+      role: back-end-api
+  
+  # Типы политик
+  policyTypes:
+    - Ingress  # Контролируем входящий трафик
+  
+  # Правила входящего трафика
+  ingress:
+    # Правило 1: Разрешить от front-end
+    - from:
+        # Только от подов с role=front-end
+        - podSelector:
+            matchLabels:
+              role: front-end
+      # На порт 80 (HTTP)
+      ports:
+        - protocol: TCP
+          port: 80
+
+---
+# Политика 2: Исходящий трафик (Egress) от front-end
+# Разрешаем front-end подключаться только к back-end-api
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: non-admin-frontend-allow-egress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: egress
+  annotations:
+    description: "Разрешить исходящий трафик от front-end только к back-end-api"
+    created-for: "PropDevelopment client services isolation"
+spec:
+  # Применяется к подам с меткой role=front-end
+  podSelector:
+    matchLabels:
+      role: front-end
+  
+  # Типы политик
+  policyTypes:
+    - Egress  # Контролируем исходящий трафик
+  
+  # Правила исходящего трафика
+  egress:
+    # Правило 1: Разрешить к back-end-api
+    - to:
+        # Только к подам с role=back-end-api
+        - podSelector:
+            matchLabels:
+              role: back-end-api
+      # На порт 80 (HTTP)
+      ports:
+        - protocol: TCP
+          port: 80
+    
+    # Правило 2: Разрешить DNS запросы (необходимо для резолвинга имен)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+# Политика 3: Запрет доступа от front-end к admin API
+# Явно запрещаем front-end обращаться к admin-back-end-api
+# (Эта политика опциональна, т.к. без разрешения трафик и так будет запрещен)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-api-deny-from-non-admin
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: ingress
+  annotations:
+    description: "Запретить доступ к admin API от обычных front-end сервисов"
+    created-for: "PropDevelopment admin services protection"
+spec:
+  # Применяется к подам с меткой role=admin-back-end-api
+  podSelector:
+    matchLabels:
+      role: admin-back-end-api
+  
+  # Типы политик
+  policyTypes:
+    - Ingress
+  
+  # Правила входящего трафика
+  ingress:
+    # Правило: Разрешить ТОЛЬКО от admin-front-end (см. admin-api-allow.yaml)
+    # Здесь мы явно НЕ разрешаем от role=front-end
+    # Поэтому трафик от front-end будет заблокирован
+    - from:
+        - podSelector:
+            matchLabels:
+              role: admin-front-end
+      ports:
+        - protocol: TCP
+          port: 80
+

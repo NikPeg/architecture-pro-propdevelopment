@@ -1,0 +1,88 @@
+##############################################################################
+# NetworkPolicy: Default Deny All
+# PropDevelopment - Network Isolation (Optional)
+#
+# Назначение: Запретить весь трафик по умолчанию (Ingress и Egress)
+# 
+# ВНИМАНИЕ: Эта политика ЗАПРЕЩАЕТ весь трафик в namespace!
+# Применяйте ПОСЛЕ настройки разрешающих политик (allow policies)
+#
+# Применение: kubectl apply -f default-deny-all.yaml
+#
+# Примечание: Это best practice для zero-trust архитектуры
+##############################################################################
+
+---
+# Политика 1: Запретить весь входящий трафик (Ingress) по умолчанию
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: default-deny
+  annotations:
+    description: "Запретить весь входящий трафик по умолчанию"
+    security-principle: "Default Deny - Explicit Allow"
+    created-for: "PropDevelopment zero-trust network"
+spec:
+  # Применяется ко ВСЕМ подам в namespace
+  podSelector: {}
+  
+  # Типы политик
+  policyTypes:
+    - Ingress
+  
+  # Нет правил ingress = запретить все входящие подключения
+  # (Разрешения будут заданы в других NetworkPolicies)
+
+---
+# Политика 2: Запретить весь исходящий трафик (Egress) по умолчанию
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: default
+  labels:
+    app: propdevelopment
+    policy-type: default-deny
+  annotations:
+    description: "Запретить весь исходящий трафик по умолчанию"
+    security-principle: "Default Deny - Explicit Allow"
+    created-for: "PropDevelopment zero-trust network"
+spec:
+  # Применяется ко ВСЕМ подам в namespace
+  podSelector: {}
+  
+  # Типы политик
+  policyTypes:
+    - Egress
+  
+  # Нет правил egress = запретить все исходящие подключения
+  # (Разрешения будут заданы в других NetworkPolicies)
+
+---
+# ВАЖНО: После применения этой политики необходимо:
+# 
+# 1. Явно разрешить DNS запросы (иначе резолвинг имен не будет работать):
+#    - Применить non-admin-api-allow.yaml (уже содержит DNS правила)
+#    - Применить admin-api-allow.yaml (уже содержит DNS правила)
+#
+# 2. Явно разрешить трафик между сервисами:
+#    - front-end ←→ back-end-api (non-admin-api-allow.yaml)
+#    - admin-front-end ←→ admin-back-end-api (admin-api-allow.yaml)
+#
+# 3. При необходимости, разрешить доступ к внешним сервисам:
+#    - Базам данных
+#    - Очередям сообщений
+#    - Внешним API
+#
+# Порядок применения (рекомендуется):
+# 1. kubectl apply -f non-admin-api-allow.yaml
+# 2. kubectl apply -f admin-api-allow.yaml
+# 3. kubectl apply -f default-deny-all.yaml  # <- В последнюю очередь!
+#
+# Откат (если что-то пошло не так):
+# kubectl delete -f default-deny-all.yaml
+
