@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-privileged
+  namespace: audit-zone
+  labels:
+    app: insecure-test
+    violation: privileged-true
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.25-alpine
+    securityContext:
+      # НАРУШЕНИЕ 1: Privileged контейнер
+      # Имеет доступ ко ВСЕМ capabilities хост-системы
+      # Может монтировать host filesystem, изменять kernel параметры
+      # Фактически root на хосте
+      privileged: true
+      
+      # Дополнительные нарушения для демонстрации
+      allowPrivilegeEscalation: true
+      runAsUser: 0  # root user
+    ports:
+    - containerPort: 80
+
