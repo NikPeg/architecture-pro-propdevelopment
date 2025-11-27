@@ -81,11 +81,11 @@ check_pod_security() {
             echo "$SEC_CTX" | jq '.' | sed 's/^/      /'
             
             # Проверка критичных параметров
-            PRIVILEGED=$(echo "$SEC_CTX" | jq -r '.privileged // "not set"')
-            RUN_AS_USER=$(echo "$SEC_CTX" | jq -r '.runAsUser // "not set"')
-            RUN_AS_NON_ROOT=$(echo "$SEC_CTX" | jq -r '.runAsNonRoot // "not set"')
-            READ_ONLY_ROOT_FS=$(echo "$SEC_CTX" | jq -r '.readOnlyRootFilesystem // "not set"')
-            ALLOW_PRIV_ESC=$(echo "$SEC_CTX" | jq -r '.allowPrivilegeEscalation // "not set"')
+            PRIVILEGED=$(echo "$SEC_CTX" | jq -r 'if has("privileged") then .privileged else "not set" end')
+            RUN_AS_USER=$(echo "$SEC_CTX" | jq -r 'if has("runAsUser") then .runAsUser else "not set" end')
+            RUN_AS_NON_ROOT=$(echo "$SEC_CTX" | jq -r 'if has("runAsNonRoot") then .runAsNonRoot else "not set" end')
+            READ_ONLY_ROOT_FS=$(echo "$SEC_CTX" | jq -r 'if has("readOnlyRootFilesystem") then .readOnlyRootFilesystem else "not set" end')
+            ALLOW_PRIV_ESC=$(echo "$SEC_CTX" | jq -r 'if has("allowPrivilegeEscalation") then .allowPrivilegeEscalation else "not set" end')
             
             echo ""
             echo -e "    ${CYAN}Security Check:${NC}"
