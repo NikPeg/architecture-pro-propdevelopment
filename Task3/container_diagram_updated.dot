@@ -1,0 +1,119 @@
+digraph PropDevelopmentContainersUpdated {
+    rankdir=TB;
+    node [shape=box, style=filled];
+    compound=true;
+    
+    // External actors
+    tenant [label="Собственник", shape=circle, fillcolor="#08427B", fontcolor=white];
+    security_staff [label="Охрана/УК", shape=circle, fillcolor="#1168BD", fontcolor=white];
+    
+    // External systems
+    payment_systems [label="Платежные\nсистемы\n(МХ, Visa, Мир)", fillcolor="#999999", fontcolor=white];
+    utilities [label="Поставщики\nЖКХ", fillcolor="#999999", fontcolor=white];
+    smart_home_partner [label="🆕 Платформа партнера\nSmart Home Services\n(Умный дом)", fillcolor="#D6B656", fontcolor=black, penwidth=3];
+    
+    // Firewall
+    firewall [label="Firewall / Gateway", shape=hexagon, fillcolor="#E74C3C", fontcolor=white];
+    
+    subgraph cluster_propdevelopment {
+        label="PropDevelopment - Обновленная архитектура";
+        style=filled;
+        fillcolor="#F0F0F0";
+        
+        // API Gateway (NEW!)
+        subgraph cluster_api_gateway {
+            label="🆕 API Gateway & Security Layer";
+            style=filled;
+            fillcolor="#D5E8D4";
+            penwidth=3;
+            
+            api_gateway [label="API Gateway\n(Kong / Apigee)\n\nФункции:\n- Rate Limiting\n- Authentication\n- Authorization\n- API Contracts Validation\n- Logging", fillcolor="#82B366", fontcolor=white, width=2.5];
+        }
+        
+        // ЖКУ Domain (UPDATED)
+        subgraph cluster_tenant_services {
+            label="Домен: Группа сервисов ЖКУ (обновлен)";
+            style=filled;
+            fillcolor="#DAE8FC";
+            
+            tenant_mobile [label="Витрина сервисов\nдля собственников\n(Мобильное приложение)\n\n🆕 Новый функционал:\n- Управление домофоном\n- Управление шлагбаумом\n- Настройка доступа гостей\n- Журнал событий доступа", fillcolor="#1168BD", fontcolor=white, width=3];
+            
+            tenant_core [label="tenant-core-app\nЯдро сервисов ЖКУ\n\n🆕 Расширен:\n- API для Умного дома\n- Интеграция с биометрией", fillcolor="#1168BD", fontcolor=white, width=2.5];
+            tenant_core_db [label="tenant-core-db", shape=cylinder, fillcolor="#4A90E2", fontcolor=white];
+            
+            // NEW Smart Home Integration Service
+            smart_home_service [label="🆕 smart-home-integration-service\n\nНовый микросервис:\n- Интеграция с платформой партнера\n- Управление устройствами\n- Обработка событий доступа\n- Управление биометрией\n- Журналирование", fillcolor="#D6B656", fontcolor=black, penwidth=3, width=3];
+            smart_home_db [label="🆕 smart-home-db\n\nХранит:\n- Устройства\n- Правила доступа\n- Биометрические шаблоны (хеши)\n- Журнал событий\n- Гостевые доступы", shape=cylinder, fillcolor="#D6B656", fontcolor=black, penwidth=3];
+            
+            crm_tenant [label="CRM\n(tenant Suite SaaS)\n\nУправление собственниками", fillcolor="#1168BD", fontcolor=white, width=2.5];
+            crm_tenant_db [label="tenant-estate-crm-db", shape=cylinder, fillcolor="#4A90E2", fontcolor=white];
+        }
+        
+        // Auth & Data Domain
+        subgraph cluster_auth_data {
+            label="Домен: Авторизация и Данные";
+            style=filled;
+            fillcolor="#FFF4E6";
+            
+            auth_service [label="auth-service-1\nАутентификация\nи авторизация\n\n🆕 Расширен:\n- OAuth 2.0 для партнеров\n- Управление API ключами", fillcolor="#F39C12", fontcolor=white, width=2.5];
+            auth_db [label="auth-db-1", shape=cylinder, fillcolor="#E67E22", fontcolor=white];
+            
+            dwh [label="DWH-1-warehouse\nХранилище данных\n\n🆕 Новые данные:\n- События Умного дома\n- Аналитика использования", fillcolor="#9B59B6", fontcolor=white, width=2.5];
+        }
+    }
+    
+    // User interactions
+    tenant -> firewall [label="HTTPS"];
+    security_staff -> firewall [label="HTTPS"];
+    firewall -> api_gateway [label=""];
+    
+    // Mobile app connections
+    api_gateway -> tenant_mobile [label="Authenticated\nRequests"];
+    tenant_mobile -> tenant_core [label="gRPC\nmTLS"];
+    tenant_mobile -> smart_home_service [label="🆕 REST API\nHTTPS\nOAuth 2.0", color="#D6B656", penwidth=2];
+    
+    // Smart Home Service integrations
+    smart_home_service -> smart_home_db [label=""];
+    smart_home_service -> tenant_core [label="Проверка прав\nсобственника\ngRPC, mTLS"];
+    smart_home_service -> crm_tenant [label="Данные о\nсобственниках\nи квартирах\ngRPC, mTLS"];
+    smart_home_service -> auth_service [label="Проверка\nтокенов\nLDAP"];
+    
+    // External integration (through API Gateway)
+    smart_home_service -> api_gateway [label="", style=invis];
+    api_gateway -> smart_home_partner [label="🆕 REST API\nHTTPS\nOAuth 2.0 + mTLS\nAPI Contract\nValidation", color="#D6B656", penwidth=3, dir=both];
+    
+    // Partner platform to external systems
+    smart_home_partner -> payment_systems [label="", style=invis];
+    smart_home_partner -> utilities [label="", style=invis];
+    
+    // Tenant Core existing integrations
+    tenant_core -> tenant_core_db [label=""];
+    tenant_core -> payment_systems [label="Платежи ЖКХ\nHTTPS"];
+    tenant_core -> utilities [label="Данные\nпотребления\nHTTPS"];
+    tenant_core -> auth_service [label="LDAP"];
+    
+    // CRM connections
+    crm_tenant -> crm_tenant_db [label=""];
+    crm_tenant -> auth_service [label="LDAP"];
+    
+    // Auth service
+    auth_service -> auth_db [label=""];
+    
+    // Data warehouse connections
+    tenant_core -> dwh [label="JDBC"];
+    crm_tenant -> dwh [label="JDBC"];
+    smart_home_service -> dwh [label="🆕 JDBC\nСобытия\nУмного дома", color="#D6B656", penwidth=2];
+    
+    // Legend
+    subgraph cluster_legend {
+        label="Условные обозначения";
+        style=filled;
+        fillcolor="#FFFACD";
+        rank=sink;
+        
+        legend1 [label="🆕 = Новые компоненты и интеграции", shape=plaintext, fillcolor="#FFFACD"];
+        legend2 [label="Желтый цвет = изменения для Умного дома", shape=plaintext, fillcolor="#FFFACD"];
+        legend3 [label="Зеленый = новый API Gateway (критично для безопасности)", shape=plaintext, fillcolor="#FFFACD"];
+    }
+}
+

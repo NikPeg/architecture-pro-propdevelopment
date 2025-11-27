@@ -1,0 +1,26 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPHostPath
+metadata:
+  name: psp-hostpath-volume
+  annotations:
+    description: "Запрет hostPath volumes в PropDevelopment"
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces:
+      - audit-zone
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - gatekeeper-system
+  parameters:
+    allowedHostPaths: []
+    # Пример разрешенных путей (если критично необходимо):
+    # - pathPrefix: "/var/log"
+    #   readOnly: true
+

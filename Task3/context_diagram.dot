@@ -1,0 +1,79 @@
+digraph SmartHomeContext {
+    rankdir=TB;
+    node [shape=box, style=filled];
+    
+    // Define node styles
+    node [shape=box];
+    
+    // External actors (people)
+    subgraph cluster_people {
+        label="Пользователи";
+        style=dashed;
+        color=gray;
+        
+        tenant [label="Собственник\n(Житель)", shape=circle, fillcolor="#08427B", fontcolor=white, width=1.5];
+        guest [label="Гость", shape=circle, fillcolor="#6C8EBF", fontcolor=white, width=1.5];
+        resident [label="Жилец\n(Арендатор)", shape=circle, fillcolor="#6C8EBF", fontcolor=white, width=1.5];
+        security [label="Охрана/\nУправляющая\nкомпания", shape=circle, fillcolor="#1168BD", fontcolor=white, width=1.5];
+    }
+    
+    // Central system
+    smart_home [label="Система управления\n'Умным домом'\nPropDevelopment", fillcolor="#1168BD", fontcolor=white, fontsize=14, width=3, height=1.5];
+    
+    // External systems
+    subgraph cluster_external {
+        label="Внешние системы";
+        style=dashed;
+        color=gray;
+        
+        partner_platform [label="Платформа партнера\nSmart Home Services", fillcolor="#999999", fontcolor=white, width=2.5];
+        intercom_hw [label="Интеллектуальный\nдомофон\n(Оборудование)", fillcolor="#B85450", fontcolor=white, width=2];
+        barrier_hw [label="Интеллектуальный\nшлагбаум\n(Оборудование)", fillcolor="#B85450", fontcolor=white, width=2];
+    }
+    
+    // PropDevelopment systems
+    subgraph cluster_propdevelopment {
+        label="Системы PropDevelopment";
+        style=filled;
+        fillcolor="#E8F4F8";
+        
+        mobile_app [label="Мобильное приложение\nдля собственников", fillcolor="#1168BD", fontcolor=white, width=2.5];
+        tenant_core [label="tenant-core-app\n(Сервисы ЖКУ)", fillcolor="#1168BD", fontcolor=white, width=2.5];
+        crm_tenant [label="CRM собственников", fillcolor="#1168BD", fontcolor=white, width=2.5];
+    }
+    
+    // User interactions with mobile app
+    tenant -> mobile_app [label="Управляет доступом\nПросматривает журнал\nДобавляет гостей", fontsize=10];
+    resident -> mobile_app [label="Получает доступ\nОткрывает двери", fontsize=10];
+    guest -> mobile_app [label="Временный доступ\n(по приглашению)", fontsize=10, style=dashed];
+    security -> mobile_app [label="Мониторинг\nЭкстренный доступ", fontsize=10];
+    
+    // Mobile app to systems
+    mobile_app -> smart_home [label="API запросы:\n- Управление устройствами\n- Настройка правил доступа\n- Журнал событий\n[HTTPS, OAuth 2.0]", fontsize=9];
+    
+    // Smart Home system integrations
+    smart_home -> tenant_core [label="Получает данные\nо собственниках\nи жильцах\n[gRPC, mTLS]", fontsize=9];
+    smart_home -> crm_tenant [label="Проверка прав\nдоступа к объектам\n[gRPC, mTLS]", fontsize=9];
+    smart_home -> partner_platform [label="API интеграция:\n- Команды управления\n- Получение событий\n- Биометрия\n[HTTPS, OAuth 2.0 + mTLS]", fontsize=9, color="#D6B656", penwidth=2];
+    
+    // Partner platform to hardware
+    partner_platform -> intercom_hw [label="Управление\nБиометрия\nВидеопоток\n[Проприетарный\nпротокол]", fontsize=9];
+    partner_platform -> barrier_hw [label="Управление\nРаспознавание номеров\nВидеопоток\n[Проприетарный\nпротокол]", fontsize=9];
+    
+    // Hardware to people (physical interaction)
+    intercom_hw -> tenant [label="Биометрическое\nраспознавание лица", fontsize=9, style=dashed, dir=both];
+    intercom_hw -> guest [label="Видеозвонок\nВизуальная идентификация", fontsize=9, style=dashed, dir=both];
+    barrier_hw -> tenant [label="Распознавание\nгос. номера авто", fontsize=9, style=dashed, dir=both];
+    
+    // Legend
+    subgraph cluster_legend {
+        label="Легенда";
+        style=filled;
+        fillcolor="#FFFACD";
+        
+        legend1 [label="Сплошная линия = цифровое взаимодействие", shape=plaintext];
+        legend2 [label="Пунктирная линия = физическое взаимодействие", shape=plaintext];
+        legend3 [label="Желтая линия = новая интеграция с партнером", shape=plaintext];
+    }
+}
+

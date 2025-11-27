@@ -1,0 +1,88 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8spspreadonlyrootfs
+  annotations:
+    description: "Требует readOnlyRootFilesystem: true для всех контейнеров"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sPSPReadOnlyRootFS
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            exemptImages:
+              description: "Список образов, освобожденных от проверки"
+              type: array
+              items:
+                type: string
+  
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8spspreadonlyrootfs
+        
+        # Violation если readOnlyRootFilesystem не установлен или false
+        violation[{"msg": msg, "details": {}}] {
+          container := input_containers[_]
+          
+          # Либо нет securityContext
+          not has_security_context(container)
+          
+          msg := sprintf("Container %v must have securityContext with readOnlyRootFilesystem: true", [container.name])
+        }
+        
+        violation[{"msg": msg, "details": {}}] {
+          container := input_containers[_]
+          
+          # Либо есть securityContext, но readOnlyRootFilesystem не true
+          has_security_context(container)
+          not container.securityContext.readOnlyRootFilesystem
+          
+          msg := sprintf("Container %v must have readOnlyRootFilesystem: true", [container.name])
+        }
+        
+        violation[{"msg": msg, "details": {}}] {
+          container := input_containers[_]
+          
+          # Или явно установлен в false
+          container.securityContext.readOnlyRootFilesystem == false
+          
+          msg := sprintf("Container %v has readOnlyRootFilesystem: false, must be true", [container.name])
+        }
+        
+        # Также проверяем init containers
+        violation[{"msg": msg, "details": {}}] {
+          container := input_init_containers[_]
+          not has_read_only_root_fs(container)
+          
+          msg := sprintf("Init container %v must have readOnlyRootFilesystem: true", [container.name])
+        }
+        
+        # Вспомогательные функции
+        input_containers[c] {
+          c := input.review.object.spec.containers[_]
+        }
+        
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+        
+        input_init_containers[c] {
+          c := input.review.object.spec.initContainers[_]
+        }
+        
+        input_init_containers[c] {
+          c := input.review.object.spec.template.spec.initContainers[_]
+        }
+        
+        has_security_context(container) {
+          container.securityContext
+        }
+        
+        has_read_only_root_fs(container) {
+          container.securityContext.readOnlyRootFilesystem == true
+        }
+

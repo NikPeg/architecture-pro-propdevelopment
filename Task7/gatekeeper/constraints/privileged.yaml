@@ -1,0 +1,27 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPPrivileged
+metadata:
+  name: psp-privileged-container
+  annotations:
+    description: "Запрет privileged контейнеров в PropDevelopment"
+spec:
+  enforcementAction: deny  # deny | dryrun | warn
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces:
+      - audit-zone
+    # Можно исключить system namespaces
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - gatekeeper-system
+  parameters:
+    exemptImages: []
+    # Пример исключений (если нужны):
+    # - "docker.io/calico/*"
+    # - "registry.k8s.io/*"
+

@@ -1,0 +1,106 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8spsprunasnonroot
+  annotations:
+    description: "Требует runAsNonRoot: true и запрещает UID 0"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sPSPRunAsNonRoot
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            exemptImages:
+              description: "Список образов, освобожденных от проверки"
+              type: array
+              items:
+                type: string
+  
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8spsprunasnonroot
+        
+        # Violation если контейнер запускается от root (UID 0)
+        violation[{"msg": msg, "details": {}}] {
+          container := input_containers[_]
+          
+          # Проверяем runAsUser = 0 на уровне контейнера
+          container.securityContext.runAsUser == 0
+          
+          msg := sprintf("Container %v runs as root (UID 0), must run as non-root", [container.name])
+        }
+        
+        # Violation если нет runAsNonRoot: true на уровне контейнера
+        violation[{"msg": msg, "details": {}}] {
+          container := input_containers[_]
+          
+          # Есть securityContext, но runAsNonRoot не установлен или false
+          has_security_context(container)
+          not container.securityContext.runAsNonRoot
+          
+          # Проверяем, что на pod level тоже нет
+          not pod_run_as_non_root
+          
+          msg := sprintf("Container %v must have runAsNonRoot: true", [container.name])
+        }
+        
+        # Violation если runAsUser = 0 на pod level
+        violation[{"msg": msg, "details": {}}] {
+          pod_security := pod_security_context
+          pod_security.runAsUser == 0
+          
+          msg := "Pod securityContext has runAsUser: 0 (root)"
+        }
+        
+        # Violation если нет runAsNonRoot на pod level и ни у одного контейнера
+        violation[{"msg": msg, "details": {}}] {
+          not pod_run_as_non_root
+          
+          # И хотя бы один контейнер без runAsNonRoot
+          container := input_containers[_]
+          not has_run_as_non_root(container)
+          
+          msg := "Pod must have runAsNonRoot: true in pod securityContext or all containers"
+        }
+        
+        # Вспомогательные функции
+        input_containers[c] {
+          c := input.review.object.spec.containers[_]
+        }
+        
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+        
+        input_init_containers[c] {
+          c := input.review.object.spec.initContainers[_]
+        }
+        
+        input_init_containers[c] {
+          c := input.review.object.spec.template.spec.initContainers[_]
+        }
+        
+        pod_security_context = sc {
+          sc := input.review.object.spec.securityContext
+        }
+        
+        pod_security_context = sc {
+          sc := input.review.object.spec.template.spec.securityContext
+        }
+        
+        pod_run_as_non_root {
+          pod_security_context.runAsNonRoot
+        }
+        
+        has_security_context(container) {
+          container.securityContext
+        }
+        
+        has_run_as_non_root(container) {
+          container.securityContext.runAsNonRoot
+        }
+

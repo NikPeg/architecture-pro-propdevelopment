@@ -1,0 +1,92 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# Политика аудита для Task7 - Pod Security Admission
+# 
+# Назначение: Логирование попыток создания небезопасных подов
+# Интеграция: Используется совместно с Pod Security Standards и OPA Gatekeeper
+# 
+# Связь с Task6: Расширение базовой политики аудита для фокуса на security контексте
+
+omitStages:
+  - "RequestReceived"
+
+rules:
+  # ============================================================================
+  # УРОВЕНЬ 1: RequestResponse - Полное логирование
+  # Критичные нарушения безопасности контейнеров
+  # ============================================================================
+  
+  # Логирование ВСЕХ операций с подами (включая violations)
+  - level: RequestResponse
+    verbs: ["create", "update", "patch"]
+    resources:
+      - group: ""
+        resources: ["pods"]
+      - group: "apps"
+        resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Логирование операций с Gatekeeper constraints
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: "constraints.gatekeeper.sh"
+        resources: ["*"]
+      - group: "templates.gatekeeper.sh"
+        resources: ["constrainttemplates"]
+    omitStages:
+      - "RequestReceived"
+  
+  # ============================================================================
+  # УРОВЕНЬ 2: Metadata - Чтение операций
+  # ============================================================================
+  
+  - level: Metadata
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["pods", "namespaces"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # ============================================================================
+  # УРОВЕНЬ 3: None - Не логируем
+  # Системные операции
+  # ============================================================================
+  
+  - level: None
+    users:
+      - "system:kube-controller-manager"
+      - "system:kube-scheduler"
+      - "system:serviceaccount:kube-system:replicaset-controller"
+    verbs: ["get", "update"]
+  
+  # ============================================================================
+  # CATCH-ALL правило
+  # ============================================================================
+  
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
+
+---
+# Примечание для развертывания:
+# 
+# Для Minikube:
+# minikube start \
+#   --extra-config=apiserver.audit-policy-file=/etc/kubernetes/audit-policy.yaml \
+#   --extra-config=apiserver.audit-log-path=/var/log/kubernetes/audit.log \
+#   --extra-config=apiserver.audit-log-maxage=7 \
+#   --mount --mount-string="$(pwd)/audit-policy.yaml:/etc/kubernetes/audit-policy.yaml"
+#
+# Для production кластера:
+# 1. Разместить файл на master nodes: /etc/kubernetes/audit-policy.yaml
+# 2. Настроить kube-apiserver:
+#    --audit-policy-file=/etc/kubernetes/audit-policy.yaml
+#    --audit-log-path=/var/log/kubernetes/audit.log
+#    --audit-log-maxage=30
+#    --audit-log-maxbackup=10
+#    --audit-log-maxsize=100
+

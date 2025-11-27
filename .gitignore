@@ -1,0 +1,10 @@
+# Task6 - временные файлы с тестовыми данными
+Task6/resources.json
+Task6/events.json
+Task6/demo-audit.log
+Task6/audit-extract.json
+
+# Общие временные файлы
+*.log
+*.tmp
+

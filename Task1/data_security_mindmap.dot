@@ -1,0 +1,142 @@
+digraph DataSecurityMindmap {
+    rankdir=LR;
+    node [shape=box, style=filled];
+    
+    // Root node
+    root [label="Безопасность\nданных", fillcolor="#FF6B6B", fontsize=16, fontcolor=white];
+    
+    // Category nodes
+    public [label="ПУБЛИЧНЫЕ\nДАННЫЕ", fillcolor="#4ECDC4", fontcolor=white];
+    internal [label="ВНУТРЕННИЕ\nДАННЫЕ", fillcolor="#45B7D1", fontcolor=white];
+    confidential [label="КОНФИДЕНЦИАЛЬНЫЕ\nДАННЫЕ", fillcolor="#FFA07A", fontcolor=white];
+    secret [label="СЕКРЕТНЫЕ\nДАННЫЕ", fillcolor="#E74C3C", fontcolor=white];
+    
+    root -> public;
+    root -> internal;
+    root -> confidential;
+    root -> secret;
+    
+    // PUBLIC DATA
+    public_data1 [label="Информация о ЖК\n(витрина продаж)", fillcolor="#E8F8F5"];
+    public_data2 [label="Планировки\nи цены квартир", fillcolor="#E8F8F5"];
+    public_data3 [label="Маркетинговые\nматериалы", fillcolor="#E8F8F5"];
+    
+    public -> public_data1;
+    public -> public_data2;
+    public -> public_data3;
+    
+    // Public risks
+    public_risk1 [label="РИСК: Искажение данных\nОценка: ЗНАЧИТЕЛЬНЫЙ", fillcolor="#FFE5E5"];
+    public_reason1 [label="Неверная информация о ценах\nи планировках может привести\nк потере доверия клиентов\nи юридическим проблемам", fillcolor="#FFF9E5", shape=note];
+    
+    public_data1 -> public_risk1;
+    public_data2 -> public_risk1;
+    public_risk1 -> public_reason1;
+    
+    public_risk2 [label="РИСК: Потеря данных\nОценка: НЕЗНАЧИТЕЛЬНЫЙ", fillcolor="#E5FFE5"];
+    public_reason2 [label="Публичные данные легко\nвосстановить из резервных\nкопий и источников", fillcolor="#FFF9E5", shape=note];
+    
+    public_data3 -> public_risk2;
+    public_risk2 -> public_reason2;
+    
+    // INTERNAL DATA
+    internal_data1 [label="BI и аналитические\nотчеты", fillcolor="#E8F4F8"];
+    internal_data2 [label="Данные о ремонтах\nи работах в ЖК", fillcolor="#E8F4F8"];
+    internal_data3 [label="Внутренние\nбизнес-процессы", fillcolor="#E8F4F8"];
+    
+    internal -> internal_data1;
+    internal -> internal_data2;
+    internal -> internal_data3;
+    
+    // Internal risks
+    internal_risk1 [label="РИСК: Утечка данных\nОценка: ЗНАЧИТЕЛЬНЫЙ", fillcolor="#FFE5E5"];
+    internal_reason1 [label="Утечка аналитики может дать\nконкурентам информацию о\nстратегии и слабых местах", fillcolor="#FFF9E5", shape=note];
+    
+    internal_data1 -> internal_risk1;
+    internal_data3 -> internal_risk1;
+    internal_risk1 -> internal_reason1;
+    
+    internal_risk2 [label="РИСК: Некачественные данные\nОценка: ЗНАЧИТЕЛЬНЫЙ", fillcolor="#FFE5E5"];
+    internal_reason2 [label="Некачественные данные в BI\nприведут к неправильным\nбизнес-решениям", fillcolor="#FFF9E5", shape=note];
+    
+    internal_data1 -> internal_risk2;
+    internal_risk2 -> internal_reason2;
+    
+    // CONFIDENTIAL DATA
+    conf_data1 [label="Персональные данные\nклиентов (ФИО, телефон,\nemail)", fillcolor="#FFE8D6"];
+    conf_data2 [label="Персональные данные\nсобственников", fillcolor="#FFE8D6"];
+    conf_data3 [label="Данные бронирований\nи осмотров", fillcolor="#FFE8D6"];
+    conf_data4 [label="Платежная информация\nпо ЖКУ", fillcolor="#FFE8D6"];
+    conf_data5 [label="CRM данные\nклиентов", fillcolor="#FFE8D6"];
+    
+    confidential -> conf_data1;
+    confidential -> conf_data2;
+    confidential -> conf_data3;
+    confidential -> conf_data4;
+    confidential -> conf_data5;
+    
+    // Confidential risks
+    conf_risk1 [label="РИСК: Утечка данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    conf_reason1 [label="Нарушение ФЗ-152 'О персональных\nданных' влечет штрафы до 500 тыс.\nруб. и репутационные потери.\nЗафиксированы случаи показа\nданных другого клиента!", fillcolor="#FFF9E5", shape=note];
+    
+    conf_data1 -> conf_risk1;
+    conf_data2 -> conf_risk1;
+    conf_data5 -> conf_risk1;
+    conf_risk1 -> conf_reason1;
+    
+    conf_risk2 [label="РИСК: Искажение данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    conf_reason2 [label="Искажение платежных данных\nприведет к финансовым потерям\nклиентов и судебным искам", fillcolor="#FFF9E5", shape=note];
+    
+    conf_data4 -> conf_risk2;
+    conf_data3 -> conf_risk2;
+    conf_risk2 -> conf_reason2;
+    
+    conf_risk3 [label="РИСК: Некачественные данные\nОценка: ЗНАЧИТЕЛЬНЫЙ", fillcolor="#FFE5E5"];
+    conf_reason3 [label="Несколько точек регистрации\nклиента без координации создают\nдубликаты и противоречия", fillcolor="#FFF9E5", shape=note];
+    
+    conf_data1 -> conf_risk3;
+    conf_data5 -> conf_risk3;
+    conf_risk3 -> conf_reason3;
+    
+    // SECRET DATA
+    secret_data1 [label="Финансовая\nотчетность компании", fillcolor="#FFD6D6"];
+    secret_data2 [label="Учетные данные\n(пароли, токены)", fillcolor="#FFD6D6"];
+    secret_data3 [label="Ключи интеграций\nс госорганами", fillcolor="#FFD6D6"];
+    secret_data4 [label="API ключи платежных\nсистем и партнеров", fillcolor="#FFD6D6"];
+    secret_data5 [label="Данные для\nонлайн-сделок", fillcolor="#FFD6D6"];
+    
+    secret -> secret_data1;
+    secret -> secret_data2;
+    secret -> secret_data3;
+    secret -> secret_data4;
+    secret -> secret_data5;
+    
+    // Secret risks
+    secret_risk1 [label="РИСК: Утечка данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    secret_reason1 [label="Утечка учетных данных и API\nключей дает злоумышленникам\nполный доступ к системам.\nОтсутствует системный контроль!", fillcolor="#FFF9E5", shape=note];
+    
+    secret_data2 -> secret_risk1;
+    secret_data3 -> secret_risk1;
+    secret_data4 -> secret_risk1;
+    secret_risk1 -> secret_reason1;
+    
+    secret_risk2 [label="РИСК: Потеря данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    secret_reason2 [label="Потеря ключей интеграций\nпарализует критичные бизнес-\nпроцессы (онлайн-сделки,\nплатежи)", fillcolor="#FFF9E5", shape=note];
+    
+    secret_data3 -> secret_risk2;
+    secret_data4 -> secret_risk2;
+    secret_risk2 -> secret_reason2;
+    
+    secret_risk3 [label="РИСК: Обесценивание данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    secret_reason3 [label="Утечка финансовой отчетности\nдаст конкурентам преимущество\nи может привести к рыночным\nманипуляциям", fillcolor="#FFF9E5", shape=note];
+    
+    secret_data1 -> secret_risk3;
+    secret_risk3 -> secret_reason3;
+    
+    secret_risk4 [label="РИСК: Искажение данных\nОценка: КРИТИЧЕСКИЙ", fillcolor="#FF6B6B", fontcolor=white];
+    secret_reason4 [label="Подмена данных онлайн-сделок\nможет привести к мошенническим\nтранзакциям и судебным искам", fillcolor="#FFF9E5", shape=note];
+    
+    secret_data5 -> secret_risk4;
+    secret_risk4 -> secret_reason4;
+}
+
