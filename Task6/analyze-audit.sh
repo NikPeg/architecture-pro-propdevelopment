@@ -161,7 +161,7 @@ echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}[5/5] Анализ: Удаление критичных ресурсов${NC}"
 echo -e "${CYAN}========================================${NC}"
 
-DELETE_EVENTS=$(jq -c 'select(.verb=="delete" and (.objectRef.resource=="namespaces" or .objectRef.resource=="persistentvolumes" or .requestURI | contains("audit-policy")))' "$AUDIT_LOG" 2>/dev/null || echo "")
+DELETE_EVENTS=$(jq -c 'select(.verb=="delete" and (.objectRef.resource=="namespaces" or .objectRef.resource=="persistentvolumes" or (.requestURI | contains("audit-policy")) or (.objectRef.name | contains("audit-policy"))))' "$AUDIT_LOG" 2>/dev/null || echo "")
 
 if [ -n "$DELETE_EVENTS" ]; then
     COUNT=$(echo "$DELETE_EVENTS" | wc -l | tr -d ' ')

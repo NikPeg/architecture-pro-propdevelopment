@@ -1,0 +1,211 @@
+{
+  "audit_summary": {
+    "analyzed_file": "./demo-audit.log",
+    "analysis_timestamp": "2025-11-27T16:37:05Z",
+    "total_suspicious_events": 5,
+    "severity_breakdown": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0
+    }
+  },
+  "incidents": {
+    "secret_access": [
+      {
+        "kind": "Event",
+        "apiVersion": "audit.k8s.io/v1",
+        "level": "RequestResponse",
+        "auditID": "abc123",
+        "stage": "ResponseComplete",
+        "requestURI": "/api/v1/namespaces/kube-system/secrets/default-token-xyz",
+        "verb": "get",
+        "user": {
+          "username": "system:serviceaccount:secure-ops:monitoring",
+          "groups": [
+            "system:serviceaccounts",
+            "system:serviceaccounts:secure-ops"
+          ]
+        },
+        "sourceIPs": [
+          "10.0.0.1"
+        ],
+        "userAgent": "kubectl/v1.28.0",
+        "objectRef": {
+          "resource": "secrets",
+          "namespace": "kube-system",
+          "name": "default-token-xyz",
+          "apiVersion": "v1"
+        },
+        "responseStatus": {
+          "metadata": {},
+          "code": 403
+        },
+        "requestReceivedTimestamp": "2025-11-27T15:00:01.000000Z",
+        "stageTimestamp": "2025-11-27T15:00:01.100000Z"
+      }
+    ],
+    "privileged_pods": [
+      {
+        "kind": "Event",
+        "apiVersion": "audit.k8s.io/v1",
+        "level": "RequestResponse",
+        "auditID": "def456",
+        "stage": "ResponseComplete",
+        "requestURI": "/api/v1/namespaces/secure-ops/pods",
+        "verb": "create",
+        "user": {
+          "username": "kubernetes-admin",
+          "groups": [
+            "system:masters",
+            "system:authenticated"
+          ]
+        },
+        "sourceIPs": [
+          "10.0.0.2"
+        ],
+        "userAgent": "kubectl/v1.28.0",
+        "objectRef": {
+          "resource": "pods",
+          "namespace": "secure-ops",
+          "name": "privileged-pod",
+          "apiVersion": "v1"
+        },
+        "requestObject": {
+          "spec": {
+            "containers": [
+              {
+                "name": "pwn",
+                "image": "alpine",
+                "securityContext": {
+                  "privileged": true,
+                  "allowPrivilegeEscalation": true
+                }
+              }
+            ]
+          }
+        },
+        "responseStatus": {
+          "metadata": {},
+          "code": 201
+        },
+        "requestReceivedTimestamp": "2025-11-27T15:01:00.000000Z",
+        "stageTimestamp": "2025-11-27T15:01:00.200000Z"
+      }
+    ],
+    "kubectl_exec": [
+      {
+        "kind": "Event",
+        "apiVersion": "audit.k8s.io/v1",
+        "level": "RequestResponse",
+        "auditID": "ghi789",
+        "stage": "ResponseComplete",
+        "requestURI": "/api/v1/namespaces/kube-system/pods/coredns-abc123/exec",
+        "verb": "create",
+        "user": {
+          "username": "john.attacker",
+          "groups": [
+            "system:authenticated"
+          ]
+        },
+        "sourceIPs": [
+          "10.0.0.3"
+        ],
+        "userAgent": "kubectl/v1.28.0",
+        "objectRef": {
+          "resource": "pods",
+          "namespace": "kube-system",
+          "name": "coredns-abc123",
+          "apiVersion": "v1",
+          "subresource": "exec"
+        },
+        "responseStatus": {
+          "metadata": {},
+          "code": 200
+        },
+        "requestReceivedTimestamp": "2025-11-27T15:02:00.000000Z",
+        "stageTimestamp": "2025-11-27T15:02:00.300000Z"
+      }
+    ],
+    "rbac_changes": [
+      {
+        "kind": "Event",
+        "apiVersion": "audit.k8s.io/v1",
+        "level": "RequestResponse",
+        "auditID": "jkl012",
+        "stage": "ResponseComplete",
+        "requestURI": "/apis/rbac.authorization.k8s.io/v1/namespaces/secure-ops/rolebindings",
+        "verb": "create",
+        "user": {
+          "username": "suspicious.user",
+          "groups": [
+            "system:authenticated"
+          ]
+        },
+        "sourceIPs": [
+          "10.0.0.4"
+        ],
+        "userAgent": "kubectl/v1.28.0",
+        "objectRef": {
+          "resource": "rolebindings",
+          "namespace": "secure-ops",
+          "name": "escalate-binding",
+          "apiGroup": "rbac.authorization.k8s.io",
+          "apiVersion": "v1"
+        },
+        "requestObject": {
+          "subjects": [
+            {
+              "kind": "ServiceAccount",
+              "name": "monitoring",
+              "namespace": "secure-ops"
+            }
+          ],
+          "roleRef": {
+            "kind": "ClusterRole",
+            "name": "cluster-admin",
+            "apiGroup": "rbac.authorization.k8s.io"
+          }
+        },
+        "responseStatus": {
+          "metadata": {},
+          "code": 201
+        },
+        "requestReceivedTimestamp": "2025-11-27T15:03:00.000000Z",
+        "stageTimestamp": "2025-11-27T15:03:00.400000Z"
+      }
+    ],
+    "resource_deletion": [
+      {
+        "kind": "Event",
+        "apiVersion": "audit.k8s.io/v1",
+        "level": "Metadata",
+        "auditID": "mno345",
+        "stage": "ResponseComplete",
+        "requestURI": "/api/v1/namespaces/secure-ops/configmaps",
+        "verb": "delete",
+        "user": {
+          "username": "admin",
+          "groups": [
+            "system:masters"
+          ]
+        },
+        "sourceIPs": [
+          "10.0.0.5"
+        ],
+        "userAgent": "kubectl/v1.28.0",
+        "objectRef": {
+          "resource": "configmaps",
+          "namespace": "kube-system",
+          "name": "audit-policy",
+          "apiVersion": "v1"
+        },
+        "responseStatus": {
+          "metadata": {},
+          "code": 404
+        },
+        "requestReceivedTimestamp": "2025-11-27T15:04:00.000000Z",
+        "stageTimestamp": "2025-11-27T15:04:00.500000Z"
+      }
+    ]
+  }
+}
