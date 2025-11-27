@@ -1,0 +1,208 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# Политика аудита для Kubernetes кластера PropDevelopment
+# 
+# Назначение: Логирование действий пользователей для обнаружения инцидентов ИБ
+# Применение: Настраивается в kube-apiserver
+#
+# Для Minikube:
+# 1. Сохранить этот файл на хосте: /path/to/audit-policy.yaml
+# 2. Запустить Minikube с параметрами:
+#    minikube start \
+#      --extra-config=apiserver.audit-policy-file=/etc/kubernetes/audit-policy.yaml \
+#      --extra-config=apiserver.audit-log-path=/var/log/audit.log \
+#      --extra-config=apiserver.audit-log-maxage=7 \
+#      --extra-config=apiserver.audit-log-maxbackup=3 \
+#      --extra-config=apiserver.audit-log-maxsize=100 \
+#      --mount --mount-string="/path/to/audit-policy.yaml:/etc/kubernetes/audit-policy.yaml"
+omitStages:
+  - "RequestReceived"  # Не логируем начальную стадию (уменьшает размер логов)
+
+rules:
+  # ============================================================================
+  # УРОВЕНЬ 1: RequestResponse - Полное логирование (запрос + ответ)
+  # Критичные операции, требующие детального аудита
+  # ============================================================================
+  
+  # Операции с секретами (КРИТИЧНО для PropDevelopment - биометрия, API ключи)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch", "get", "list"]
+    resources:
+      - group: ""
+        resources: ["secrets"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Операции с подами (включая privileged pods, exec, port-forward)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch", "get", "list"]
+    resources:
+      - group: ""
+        resources: ["pods", "pods/exec", "pods/portforward", "pods/log"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Операции с RBAC (изменения прав доступа)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch", "get", "list"]
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Операции с ServiceAccounts (потенциальная эскалация привилегий)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch"]
+    resources:
+      - group: ""
+        resources: ["serviceaccounts"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Операции с ConfigMaps (могут содержать конфиденциальные данные)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch"]
+    resources:
+      - group: ""
+        resources: ["configmaps"]
+    omitStages:
+      - "RequestReceived"
+  
+  # NetworkPolicies (безопасность из Task5)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch"]
+    resources:
+      - group: "networking.k8s.io"
+        resources: ["networkpolicies"]
+    omitStages:
+      - "RequestReceived"
+  
+  # PersistentVolumes и PersistentVolumeClaims (доступ к данным)
+  - level: RequestResponse
+    verbs: ["create", "delete", "update", "patch"]
+    resources:
+      - group: ""
+        resources: ["persistentvolumes", "persistentvolumeclaims"]
+    omitStages:
+      - "RequestReceived"
+  
+  # Namespaces (создание/удаление может быть признаком атаки)
+  - level: RequestResponse
+    verbs: ["create", "delete"]
+    resources:
+      - group: ""
+        resources: ["namespaces"]
+    omitStages:
+      - "RequestReceived"
+  
+  # ============================================================================
+  # УРОВЕНЬ 2: Request - Логирование запроса (без ответа)
+  # Средне-важные операции
+  # ============================================================================
+  
+  # Чтение секретов и ConfigMaps (менее критично чем изменение)
+  - level: Request
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # ============================================================================
+  # УРОВЕНЬ 3: Metadata - Только метаданные (без тела запроса/ответа)
+  # Обычные операции для мониторинга активности
+  # ============================================================================
+  
+  # Все остальные операции с core ресурсами
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["*"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # Все операции с apps (deployments, statefulsets, etc.)
+  - level: Metadata
+    resources:
+      - group: "apps"
+        resources: ["*"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # Все операции с batch (jobs, cronjobs)
+  - level: Metadata
+    resources:
+      - group: "batch"
+        resources: ["*"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # Все операции с networking (services, ingresses)
+  - level: Metadata
+    resources:
+      - group: "networking.k8s.io"
+        resources: ["*"]
+    omitStages:
+      - "RequestReceived"
+      - "ResponseStarted"
+  
+  # ============================================================================
+  # УРОВЕНЬ 4: None - НЕ логируем
+  # Слишком частые или неинформативные запросы
+  # ============================================================================
+  
+  # Не логируем health checks и метрики (слишком много шума)
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+  
+  - level: None
+    users: ["system:unsecured"]
+    namespaces: ["kube-system"]
+    verbs: ["get"]
+    resources:
+      - group: ""
+        resources: ["configmaps"]
+  
+  - level: None
+    users: ["kubelet"]
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["nodes", "nodes/status"]
+  
+  # Не логируем операции системных компонентов (kube-controller-manager, kube-scheduler)
+  - level: None
+    users:
+      - "system:kube-controller-manager"
+      - "system:kube-scheduler"
+      - "system:serviceaccount:kube-system:endpoint-controller"
+    verbs: ["get", "update"]
+    namespaces: ["kube-system"]
+  
+  # Не логируем чтение собственного статуса
+  - level: None
+    users: ["system:apiserver"]
+    verbs: ["get"]
+    resources:
+      - group: ""
+        resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  
+  # ============================================================================
+  # CATCH-ALL правило в конце
+  # Все остальное - базовый уровень Metadata
+  # ============================================================================
+  
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
+
