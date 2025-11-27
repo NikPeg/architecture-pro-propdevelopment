@@ -38,13 +38,13 @@ echo -e "${BLUE}Привязка пользователей к ролям${NC}"
 echo -e "${BLUE}PropDevelopment Kubernetes RBAC${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# Проверка наличия Minikube
-if ! minikube status > /dev/null 2>&1; then
-    echo -e "${RED}[ERROR] Minikube не запущен. Запустите: minikube start${NC}"
+# Проверка Kubernetes кластера
+if ! kubectl cluster-info > /dev/null 2>&1; then
+    echo -e "${RED}[ERROR] Kubernetes кластер недоступен${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[OK] Minikube запущен${NC}"
+echo -e "${GREEN}[OK] Kubernetes кластер доступен${NC}"
 
 # Создание директории для манифестов
 MANIFEST_DIR="./k8s-rbac-manifests"
@@ -95,12 +95,13 @@ echo ""
 
 create_cluster_role_binding() {
     local BINDING_NAME=$1
-    local USER=$2
-    local ROLE=$3
-    local DESCRIPTION=$4
+    local SA_NAME=$2
+    local SA_NAMESPACE=$3
+    local ROLE=$4
+    local DESCRIPTION=$5
     
     echo -e "${BLUE}Создание ClusterRoleBinding: $BINDING_NAME${NC}"
-    echo -e "${YELLOW}  User: $USER → Role: $ROLE${NC}"
+    echo -e "${YELLOW}  ServiceAccount: $SA_NAME (ns: $SA_NAMESPACE) → Role: $ROLE${NC}"
     echo -e "${YELLOW}  $DESCRIPTION${NC}"
     
     cat > "$MANIFEST_DIR/bindings/crb-$BINDING_NAME.yaml" <<EOF
@@ -109,7 +110,7 @@ kind: ClusterRoleBinding
 metadata:
   name: $BINDING_NAME
   labels:
-    rbac.propdevelopment.ru/user: $USER
+    rbac.propdevelopment.ru/serviceaccount: $SA_NAME
     rbac.propdevelopment.ru/role: $ROLE
   annotations:
     description: "$DESCRIPTION"
@@ -120,9 +121,9 @@ roleRef:
   kind: ClusterRole
   name: $ROLE
 subjects:
-- kind: User
-  name: $USER
-  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: $SA_NAME
+  namespace: $SA_NAMESPACE
 EOF
     
     kubectl apply -f "$MANIFEST_DIR/bindings/crb-$BINDING_NAME.yaml" > /dev/null
@@ -136,13 +137,14 @@ EOF
 
 create_role_binding() {
     local BINDING_NAME=$1
-    local USER=$2
-    local ROLE=$3
-    local NAMESPACE=$4
-    local DESCRIPTION=$5
+    local SA_NAME=$2
+    local SA_NAMESPACE=$3
+    local ROLE=$4
+    local TARGET_NAMESPACE=$5
+    local DESCRIPTION=$6
     
     echo -e "${BLUE}Создание RoleBinding: $BINDING_NAME${NC}"
-    echo -e "${YELLOW}  User: $USER → Role: $ROLE в namespace: $NAMESPACE${NC}"
+    echo -e "${YELLOW}  ServiceAccount: $SA_NAME (ns: $SA_NAMESPACE) → Role: $ROLE в namespace: $TARGET_NAMESPACE${NC}"
     echo -e "${YELLOW}  $DESCRIPTION${NC}"
     
     cat > "$MANIFEST_DIR/bindings/rb-$BINDING_NAME.yaml" <<EOF
@@ -150,11 +152,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: $BINDING_NAME
-  namespace: $NAMESPACE
+  namespace: $TARGET_NAMESPACE
   labels:
-    rbac.propdevelopment.ru/user: $USER
+    rbac.propdevelopment.ru/serviceaccount: $SA_NAME
     rbac.propdevelopment.ru/role: $ROLE
-    rbac.propdevelopment.ru/namespace: $NAMESPACE
+    rbac.propdevelopment.ru/namespace: $TARGET_NAMESPACE
   annotations:
     description: "$DESCRIPTION"
     created-by: "RBAC automation script"
@@ -164,13 +166,13 @@ roleRef:
   kind: Role
   name: $ROLE
 subjects:
-- kind: User
-  name: $USER
-  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: $SA_NAME
+  namespace: $SA_NAMESPACE
 EOF
     
     kubectl apply -f "$MANIFEST_DIR/bindings/rb-$BINDING_NAME.yaml" > /dev/null
-    echo -e "${GREEN}[OK] RoleBinding $BINDING_NAME создан в namespace $NAMESPACE${NC}"
+    echo -e "${GREEN}[OK] RoleBinding $BINDING_NAME создан в namespace $TARGET_NAMESPACE${NC}"
     echo ""
 }
 
@@ -187,28 +189,32 @@ echo ""
 # 1. CTO → cluster-admin (Emergency Access Only!)
 create_cluster_role_binding \
     "cto-cluster-admin" \
-    "olga.cto" \
+    "olga-cto" \
+    "kube-system" \
     "cluster-admin" \
     "CTO - полный доступ к кластеру (ТОЛЬКО для экстренных случаев!)"
 
 # 2. Security Engineer → security-admin
 create_cluster_role_binding \
     "security-team-admin" \
-    "ivan.security" \
+    "ivan-security" \
+    "propdevelopment-rbac" \
     "security-admin" \
     "Security Engineer - аудит, мониторинг, управление политиками безопасности"
 
 # 3. DevOps Engineer → devops-engineer
 create_cluster_role_binding \
     "devops-team-engineer" \
-    "anna.devops" \
+    "anna-devops" \
+    "propdevelopment-rbac" \
     "devops-engineer" \
     "DevOps Engineer - управление deployments, services, infrastructure"
 
 # 4. Business Analyst → viewer
 create_cluster_role_binding \
     "business-analyst-viewer" \
-    "elena.viewer" \
+    "elena-viewer" \
+    "propdevelopment-rbac" \
     "viewer" \
     "Business Analyst - просмотр статуса приложений и метрик"
 
@@ -222,10 +228,11 @@ echo -e "${BLUE}Создание RoleBindings для доменов${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 5. Developer → developer в sales-domain
+# 5. Developer → developer в sales-domain  
 create_role_binding \
     "developer-sales-domain" \
-    "dmitry.dev" \
+    "dmitry-dev" \
+    "sales-domain" \
     "developer" \
     "sales-domain" \
     "Developer Sales Team - разработка и отладка в домене продаж"
@@ -237,16 +244,16 @@ kind: ClusterRoleBinding
 metadata:
   name: developer-sales-cluster
   labels:
-    rbac.propdevelopment.ru/user: dmitry.dev
+    rbac.propdevelopment.ru/serviceaccount: dmitry-dev
     rbac.propdevelopment.ru/role: developer
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: developer
 subjects:
-- kind: User
-  name: dmitry.dev
-  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: dmitry-dev
+  namespace: sales-domain
 EOF
 kubectl apply -f "$MANIFEST_DIR/bindings/crb-developer-sales.yaml" > /dev/null
 echo -e "${GREEN}[OK] Дополнительный ClusterRoleBinding для developer создан${NC}"
@@ -255,7 +262,8 @@ echo ""
 # 6. Domain Admin Sales → domain-admin в sales-domain
 create_role_binding \
     "domain-admin-sales" \
-    "sergey.sales" \
+    "sergey-sales" \
+    "sales-domain" \
     "domain-admin" \
     "sales-domain" \
     "Domain Admin Sales - полное управление доменом продаж"
@@ -263,7 +271,8 @@ create_role_binding \
 # 7. Domain Admin Tenant → domain-admin в tenant-domain
 create_role_binding \
     "domain-admin-tenant" \
-    "maria.tenant" \
+    "maria-tenant" \
+    "tenant-domain" \
     "domain-admin" \
     "tenant-domain" \
     "Domain Admin Tenant - полное управление доменом ЖКУ и Умный дом"
@@ -271,7 +280,8 @@ create_role_binding \
 # 8. Smart Home Operator → smart-home-operator в tenant-domain
 create_role_binding \
     "smart-home-operator-tenant" \
-    "alexey.smarthome" \
+    "alexey-smarthome" \
+    "tenant-domain" \
     "smart-home-operator" \
     "tenant-domain" \
     "Smart Home Operator - управление сервисами Умного дома"
@@ -621,14 +631,14 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Созданные привязки:${NC}"
 echo -e "${BLUE}----------------------------------------${NC}"
-echo -e "1. ${YELLOW}olga.cto${NC}           → cluster-admin (весь кластер)"
-echo -e "2. ${YELLOW}ivan.security${NC}      → security-admin (весь кластер)"
-echo -e "3. ${YELLOW}anna.devops${NC}        → devops-engineer (весь кластер)"
-echo -e "4. ${YELLOW}dmitry.dev${NC}         → developer (sales-domain)"
-echo -e "5. ${YELLOW}elena.viewer${NC}       → viewer (весь кластер, read-only)"
-echo -e "6. ${YELLOW}sergey.sales${NC}       → domain-admin (sales-domain)"
-echo -e "7. ${YELLOW}maria.tenant${NC}       → domain-admin (tenant-domain)"
-echo -e "8. ${YELLOW}alexey.smarthome${NC}   → smart-home-operator (tenant-domain)"
+echo -e "1. ${YELLOW}olga-cto${NC}           → cluster-admin (весь кластер)"
+echo -e "2. ${YELLOW}ivan-security${NC}      → security-admin (весь кластер)"
+echo -e "3. ${YELLOW}anna-devops${NC}        → devops-engineer (весь кластер)"
+echo -e "4. ${YELLOW}dmitry-dev${NC}         → developer (sales-domain)"
+echo -e "5. ${YELLOW}elena-viewer${NC}       → viewer (весь кластер, read-only)"
+echo -e "6. ${YELLOW}sergey-sales${NC}       → domain-admin (sales-domain)"
+echo -e "7. ${YELLOW}maria-tenant${NC}       → domain-admin (tenant-domain)"
+echo -e "8. ${YELLOW}alexey-smarthome${NC}   → smart-home-operator (tenant-domain)"
 
 echo ""
 echo -e "${BLUE}Групповые привязки:${NC}"
@@ -653,5 +663,5 @@ echo -e "${GREEN}Кластер PropDevelopment защищен согласно 
 # Финальная проверка
 echo ""
 echo -e "${BLUE}Финальная проверка RBAC:${NC}"
-kubectl auth can-i --list --as=ivan.security | head -20
+kubectl auth can-i --list --as=system:serviceaccount:propdevelopment-rbac:ivan-security | head -20
 

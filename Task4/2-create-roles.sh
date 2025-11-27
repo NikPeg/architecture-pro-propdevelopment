@@ -41,13 +41,13 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Создание ролей для кластера PropDevelopment${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# Проверка наличия Minikube
-if ! minikube status > /dev/null 2>&1; then
-    echo -e "${RED}[ERROR] Minikube не запущен. Запустите: minikube start${NC}"
+# Проверка Kubernetes кластера
+if ! kubectl cluster-info > /dev/null 2>&1; then
+    echo -e "${RED}[ERROR] Kubernetes кластер недоступен${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[OK] Minikube запущен${NC}"
+echo -e "${GREEN}[OK] Kubernetes кластер доступен${NC}"
 
 # Создание директории для манифестов
 MANIFEST_DIR="./k8s-rbac-manifests"

@@ -44,186 +44,118 @@ fi
 
 echo -e "${GREEN}[OK] Kubernetes кластер доступен${NC}"
 
-# Создание директорий для хранения сертификатов
-CERT_DIR="./k8s-users-certs"
-mkdir -p "$CERT_DIR"
+# Создание директорий для манифестов
+SA_DIR="./k8s-serviceaccounts"
+mkdir -p "$SA_DIR"
 
-echo -e "${YELLOW}[INFO] Сертификаты будут сохранены в: $CERT_DIR${NC}"
+echo -e "${YELLOW}[INFO] ServiceAccount манифесты будут сохранены в: $SA_DIR${NC}"
+echo -e "${YELLOW}[INFO] Используем ServiceAccounts вместо пользователей с сертификатами${NC}"
+echo -e "${YELLOW}      (для совместимости с любым Kubernetes кластером)${NC}"
 
-# Получение CA сертификата и ключа из Minikube
-MINIKUBE_HOME=$(minikube status -o json | grep Host | awk '{print $2}' | tr -d '",' || echo "$HOME/.minikube")
-CA_CERT="$HOME/.minikube/ca.crt"
-CA_KEY="$HOME/.minikube/ca.key"
-
-if [[ ! -f "$CA_CERT" ]] || [[ ! -f "$CA_KEY" ]]; then
-    echo -e "${RED}[ERROR] CA сертификаты не найдены в $HOME/.minikube/${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}[OK] CA сертификаты найдены${NC}"
-
-# Функция создания пользователя
-create_user() {
-    local USERNAME=$1
-    local COMMON_NAME=$2
-    local ORGANIZATION=$3  # Группа/роль для RBAC
+# Функция создания ServiceAccount
+create_service_account() {
+    local SA_NAME=$1
+    local NAMESPACE=$2
+    local DESCRIPTION=$3
     
     echo ""
     echo -e "${BLUE}----------------------------------------${NC}"
-    echo -e "${BLUE}Создание пользователя: $USERNAME${NC}"
-    echo -e "${BLUE}Common Name: $COMMON_NAME${NC}"
-    echo -e "${BLUE}Organization: $ORGANIZATION${NC}"
+    echo -e "${BLUE}Создание ServiceAccount: $SA_NAME${NC}"
+    echo -e "${BLUE}Namespace: $NAMESPACE${NC}"
+    echo -e "${BLUE}Description: $DESCRIPTION${NC}"
     echo -e "${BLUE}----------------------------------------${NC}"
     
-    USER_DIR="$CERT_DIR/$USERNAME"
-    mkdir -p "$USER_DIR"
+    # Создание namespace если не существует
+    if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
+        kubectl create namespace "$NAMESPACE" > /dev/null
+        echo -e "${GREEN}[OK] Namespace $NAMESPACE создан${NC}"
+    fi
     
-    # 1. Создание приватного ключа
-    echo -e "${YELLOW}[1/5] Генерация приватного ключа...${NC}"
-    openssl genrsa -out "$USER_DIR/$USERNAME.key" 2048 2>/dev/null
-    echo -e "${GREEN}[OK] Приватный ключ создан: $USER_DIR/$USERNAME.key${NC}"
-    
-    # 2. Создание Certificate Signing Request (CSR)
-    echo -e "${YELLOW}[2/5] Создание Certificate Signing Request...${NC}"
-    openssl req -new \
-        -key "$USER_DIR/$USERNAME.key" \
-        -out "$USER_DIR/$USERNAME.csr" \
-        -subj "/CN=$COMMON_NAME/O=$ORGANIZATION" 2>/dev/null
-    echo -e "${GREEN}[OK] CSR создан: $USER_DIR/$USERNAME.csr${NC}"
-    
-    # 3. Подписание сертификата с помощью CA кластера
-    echo -e "${YELLOW}[3/5] Подписание сертификата CA кластера...${NC}"
-    openssl x509 -req \
-        -in "$USER_DIR/$USERNAME.csr" \
-        -CA "$CA_CERT" \
-        -CAkey "$CA_KEY" \
-        -CAcreateserial \
-        -out "$USER_DIR/$USERNAME.crt" \
-        -days 365 2>/dev/null
-    echo -e "${GREEN}[OK] Сертификат подписан: $USER_DIR/$USERNAME.crt${NC}"
-    
-    # 4. Создание kubeconfig для пользователя
-    echo -e "${YELLOW}[4/5] Создание kubeconfig файла...${NC}"
-    
-    # Получение адреса API сервера
-    API_SERVER=$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}')
-    
-    # Создание kubeconfig
-    cat > "$USER_DIR/$USERNAME-kubeconfig.yaml" <<EOF
+    # Создание ServiceAccount
+    cat > "$SA_DIR/$SA_NAME.yaml" <<EOF
 apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority-data: $(cat "$CA_CERT" | base64 | tr -d '\n')
-    server: $API_SERVER
-  name: propdevelopment-cluster
-contexts:
-- context:
-    cluster: propdevelopment-cluster
-    user: $USERNAME
-    namespace: default
-  name: $USERNAME-context
-current-context: $USERNAME-context
-users:
-- name: $USERNAME
-  user:
-    client-certificate-data: $(cat "$USER_DIR/$USERNAME.crt" | base64 | tr -d '\n')
-    client-key-data: $(cat "$USER_DIR/$USERNAME.key" | base64 | tr -d '\n')
+kind: ServiceAccount
+metadata:
+  name: $SA_NAME
+  namespace: $NAMESPACE
+  labels:
+    app: propdevelopment-rbac
+  annotations:
+    description: "$DESCRIPTION"
 EOF
     
-    echo -e "${GREEN}[OK] Kubeconfig создан: $USER_DIR/$USERNAME-kubeconfig.yaml${NC}"
-    
-    # 5. Добавление пользователя в основной kubeconfig (опционально, для тестирования)
-    echo -e "${YELLOW}[5/5] Добавление пользователя в kubectl config...${NC}"
-    
-    kubectl config set-credentials "$USERNAME" \
-        --client-certificate="$USER_DIR/$USERNAME.crt" \
-        --client-key="$USER_DIR/$USERNAME.key" \
-        --embed-certs=true > /dev/null
-    
-    kubectl config set-context "$USERNAME-context" \
-        --cluster=minikube \
-        --user="$USERNAME" \
-        --namespace=default > /dev/null
-    
-    echo -e "${GREEN}[OK] Пользователь добавлен в kubectl config${NC}"
-    echo -e "${GREEN}[✓] Пользователь $USERNAME успешно создан!${NC}"
-    
-    # Информация для пользователя
-    echo -e "${YELLOW}[INFO] Для использования этого пользователя:${NC}"
-    echo -e "  export KUBECONFIG=$USER_DIR/$USERNAME-kubeconfig.yaml"
-    echo -e "  или: kubectl --context=$USERNAME-context get pods"
+    kubectl apply -f "$SA_DIR/$SA_NAME.yaml" > /dev/null
+    echo -e "${GREEN}[✓] ServiceAccount $SA_NAME создан в namespace $NAMESPACE${NC}"
 }
 
 # ============================================================================
-# Создание пользователей
+# Создание ServiceAccounts
 # ============================================================================
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}Начало создания пользователей...${NC}"
+echo -e "${BLUE}Создание ServiceAccounts...${NC}"
 echo -e "${BLUE}========================================${NC}"
 
 # 1. Security Engineer (роль: security-admin)
-create_user "ivan.security" "Ivan Petrov" "security-team"
+create_service_account "ivan-security" "propdevelopment-rbac" "Security Engineer - аудит и мониторинг безопасности"
 
 # 2. DevOps Engineer (роль: devops-engineer)
-create_user "anna.devops" "Anna Smirnova" "devops-team"
+create_service_account "anna-devops" "propdevelopment-rbac" "DevOps Engineer - управление инфраструктурой"
 
 # 3. Developer Sales Domain (роль: developer в sales-domain)
-create_user "dmitry.dev" "Dmitry Ivanov" "developers:sales"
+create_service_account "dmitry-dev" "sales-domain" "Developer - разработка в домене продаж"
 
 # 4. Business Analyst (роль: viewer)
-create_user "elena.viewer" "Elena Kozlova" "viewers"
+create_service_account "elena-viewer" "propdevelopment-rbac" "Business Analyst - просмотр метрик и статусов"
 
 # 5. Domain Admin Sales (роль: domain-admin-sales)
-create_user "sergey.sales" "Sergey Volkov" "domain-admins:sales"
+create_service_account "sergey-sales" "sales-domain" "Domain Admin - управление доменом продаж"
 
 # 6. Domain Admin Tenant (роль: domain-admin-tenant)
-create_user "maria.tenant" "Maria Orlova" "domain-admins:tenant"
+create_service_account "maria-tenant" "tenant-domain" "Domain Admin - управление доменом ЖКУ"
 
 # 7. Smart Home Operator (роль: smart-home-operator)
-create_user "alexey.smarthome" "Alexey Sokolov" "smart-home-operators"
+create_service_account "alexey-smarthome" "tenant-domain" "Smart Home Operator - управление сервисами Умного дома"
 
 # 8. CTO - Emergency Access (роль: cluster-admin)
-create_user "olga.cto" "Olga Kuznetsova (CTO)" "system:masters"
+create_service_account "olga-cto" "kube-system" "CTO - полный доступ к кластеру (emergency only)"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}✓ Все пользователи успешно созданы!${NC}"
+echo -e "${GREEN}✓ Все ServiceAccounts успешно созданы!${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # Сводная информация
 echo ""
-echo -e "${BLUE}Созданные пользователи:${NC}"
+echo -e "${BLUE}Созданные ServiceAccounts:${NC}"
 echo -e "${BLUE}----------------------------------------${NC}"
-echo -e "1. ${YELLOW}ivan.security${NC}      - Security Engineer"
-echo -e "2. ${YELLOW}anna.devops${NC}        - DevOps Engineer"
-echo -e "3. ${YELLOW}dmitry.dev${NC}         - Developer (Sales)"
-echo -e "4. ${YELLOW}elena.viewer${NC}       - Business Analyst"
-echo -e "5. ${YELLOW}sergey.sales${NC}       - Domain Admin (Sales)"
-echo -e "6. ${YELLOW}maria.tenant${NC}       - Domain Admin (Tenant)"
-echo -e "7. ${YELLOW}alexey.smarthome${NC}   - Smart Home Operator"
-echo -e "8. ${YELLOW}olga.cto${NC}           - CTO (Emergency Access)"
+echo -e "1. ${YELLOW}ivan-security${NC}      - Security Engineer (propdevelopment-rbac)"
+echo -e "2. ${YELLOW}anna-devops${NC}        - DevOps Engineer (propdevelopment-rbac)"
+echo -e "3. ${YELLOW}dmitry-dev${NC}         - Developer (sales-domain)"
+echo -e "4. ${YELLOW}elena-viewer${NC}       - Business Analyst (propdevelopment-rbac)"
+echo -e "5. ${YELLOW}sergey-sales${NC}       - Domain Admin (sales-domain)"
+echo -e "6. ${YELLOW}maria-tenant${NC}       - Domain Admin (tenant-domain)"
+echo -e "7. ${YELLOW}alexey-smarthome${NC}   - Smart Home Operator (tenant-domain)"
+echo -e "8. ${YELLOW}olga-cto${NC}           - CTO (kube-system)"
 
 echo ""
-echo -e "${YELLOW}[INFO] Сертификаты сохранены в: $CERT_DIR${NC}"
-echo -e "${YELLOW}[INFO] Срок действия сертификатов: 365 дней${NC}"
+echo -e "${YELLOW}[INFO] ServiceAccount манифесты сохранены в: $SA_DIR${NC}"
 echo ""
 echo -e "${BLUE}Следующие шаги:${NC}"
 echo -e "  1. Запустите скрипт создания ролей: ${GREEN}./2-create-roles.sh${NC}"
-echo -e "  2. Запустите скрипт привязки пользователей к ролям: ${GREEN}./3-bind-users-to-roles.sh${NC}"
-echo -e "  3. Проверьте доступ: ${GREEN}kubectl --context=ivan.security-context get pods${NC}"
+echo -e "  2. Запустите скрипт привязки к ролям: ${GREEN}./3-bind-users-to-roles.sh${NC}"
+echo -e "  3. Проверьте доступ: ${GREEN}kubectl --as=system:serviceaccount:propdevelopment-rbac:ivan-security get pods${NC}"
 
 echo ""
 echo -e "${GREEN}[SUCCESS] Скрипт успешно завершен!${NC}"
 
-# Проверка созданных пользователей
+# Проверка созданных ServiceAccounts
 echo ""
-echo -e "${BLUE}Проверка созданных контекстов:${NC}"
-kubectl config get-contexts | grep -E "(NAME|security|devops|dev|viewer|sales|tenant|smarthome|cto)"
+echo -e "${BLUE}Проверка созданных ServiceAccounts:${NC}"
+kubectl get serviceaccounts -A | grep -E "(NAMESPACE|propdevelopment|sales|tenant|kube-system)" | grep -E "(ivan|anna|dmitry|elena|sergey|maria|alexey|olga|NAMESPACE)"
 
 echo ""
-echo -e "${YELLOW}[ВАЖНО] Пока пользователи созданы, но не имеют прав в кластере.${NC}"
+echo -e "${YELLOW}[ВАЖНО] ServiceAccounts созданы, но не имеют прав в кластере.${NC}"
 echo -e "${YELLOW}Права будут назначены после выполнения скриптов 2 и 3.${NC}"
 
