@@ -21,7 +21,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: non-admin-api-allow-ingress
-  namespace: default
+  namespace: propdevelopment-demo
   labels:
     app: propdevelopment
     policy-type: ingress
@@ -58,7 +58,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: non-admin-frontend-allow-egress
-  namespace: default
+  namespace: propdevelopment-demo
   labels:
     app: propdevelopment
     policy-type: egress
@@ -105,7 +105,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: admin-api-deny-from-non-admin
-  namespace: default
+  namespace: propdevelopment-demo
   labels:
     app: propdevelopment
     policy-type: ingress

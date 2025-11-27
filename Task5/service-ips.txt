@@ -1,0 +1,13 @@
+# IP адреса подов PropDevelopment
+# Создано: Thu Nov 27 18:52:37 MSK 2025
+
+FRONT_END_IP=fcff:0:675:1:9dd4:fb20:e63b:374e
+BACK_END_API_IP=fcff:0:675:1:9dd4:fb20:e63b:3766
+ADMIN_FRONT_END_IP=fcff:0:675:1:9dd4:fb20:e63b:3760
+ADMIN_BACK_END_API_IP=fcff:0:675:1:aab0:8496:6441:3855
+
+# Service DNS names
+FRONT_END_DNS=front-end-app.propdevelopment-demo.svc.cluster.local
+BACK_END_API_DNS=back-end-api-app.propdevelopment-demo.svc.cluster.local
+ADMIN_FRONT_END_DNS=admin-front-end-app.propdevelopment-demo.svc.cluster.local
+ADMIN_BACK_END_API_DNS=admin-back-end-api-app.propdevelopment-demo.svc.cluster.local

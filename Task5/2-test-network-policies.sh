@@ -34,7 +34,13 @@ echo -e "${BLUE}Тестирование NetworkPolicies${NC}"
 echo -e "${BLUE}PropDevelopment Network Isolation${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-NAMESPACE="default"
+NAMESPACE="propdevelopment-demo"
+
+# Проверка Kubernetes
+if ! kubectl cluster-info > /dev/null 2>&1; then
+    echo -e "${RED}[ERROR] Kubernetes кластер недоступен${NC}"
+    exit 1
+fi
 
 # Проверка существования подов
 echo ""
@@ -94,19 +100,14 @@ test_connectivity() {
     echo -e "${YELLOW}Источник: $SOURCE_POD${NC}"
     echo -e "${YELLOW}Цель: $TARGET_POD${NC}"
     
-    # Получаем IP целевого пода
-    TARGET_IP=$(kubectl get pod "$TARGET_POD" -n "$NAMESPACE" -o jsonpath='{.status.podIP}')
+    # Используем Service DNS вместо IP (для поддержки IPv6)
+    TARGET_SERVICE="$TARGET_POD"
     
-    if [ -z "$TARGET_IP" ]; then
-        echo -e "${RED}[ERROR] Не удалось получить IP для $TARGET_POD${NC}"
-        return 1
-    fi
-    
-    echo -e "${BLUE}Целевой IP: $TARGET_IP${NC}"
-    echo -e "${YELLOW}Выполнение: wget -qO- --timeout=2 http://$TARGET_IP${NC}"
+    echo -e "${BLUE}Целевой Service: $TARGET_SERVICE${NC}"
+    echo -e "${YELLOW}Выполнение: curl -s --max-time 2 http://$TARGET_SERVICE${NC}"
     
     # Выполняем тест
-    if kubectl exec "$SOURCE_POD" -n "$NAMESPACE" -- wget -qO- --timeout=2 "http://$TARGET_IP" &> /dev/null; then
+    if kubectl exec "$SOURCE_POD" -n "$NAMESPACE" -- curl -s --max-time 2 "http://$TARGET_SERVICE" &> /dev/null; then
         # Успешное подключение
         if [ "$EXPECTED_RESULT" == "allow" ]; then
             echo -e "${GREEN}✓ PASS: Соединение установлено (ожидаемо)${NC}"

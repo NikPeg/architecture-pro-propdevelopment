@@ -33,14 +33,13 @@ echo -e "${BLUE}Развертывание сервисов PropDevelopment${NC}
 echo -e "${BLUE}Network Isolation Demo${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# Проверка Minikube
-if ! minikube status > /dev/null 2>&1; then
-    echo -e "${RED}[ERROR] Minikube не запущен${NC}"
-    echo -e "${YELLOW}Запустите: minikube start --network-plugin=cni --cni=calico${NC}"
+# Проверка Kubernetes кластера
+if ! kubectl cluster-info > /dev/null 2>&1; then
+    echo -e "${RED}[ERROR] Kubernetes кластер недоступен${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[OK] Minikube запущен${NC}"
+echo -e "${GREEN}[OK] Kubernetes кластер доступен${NC}"
 
 # Проверка поддержки NetworkPolicy
 echo -e "${YELLOW}[INFO] Проверка поддержки NetworkPolicies...${NC}"
@@ -55,9 +54,16 @@ else
     echo -e "${GREEN}[OK] CNI plugin настроен${NC}"
 fi
 
-# Создание namespace (опционально, используем default)
-NAMESPACE="default"
-echo -e "${YELLOW}[INFO] Используем namespace: $NAMESPACE${NC}"
+# Создание отдельного namespace для демонстрации
+NAMESPACE="propdevelopment-demo"
+echo -e "${YELLOW}[INFO] Создание namespace: $NAMESPACE${NC}"
+
+if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
+    kubectl create namespace "$NAMESPACE" > /dev/null
+    echo -e "${GREEN}[OK] Namespace $NAMESPACE создан${NC}"
+else
+    echo -e "${GREEN}[OK] Namespace $NAMESPACE существует${NC}"
+fi
 
 # ============================================================================
 # РАЗВЕРТЫВАНИЕ СЕРВИСОВ
@@ -165,7 +171,7 @@ echo -e "${BLUE}  back-end-api-app IP: $BACKEND_IP${NC}"
 
 # Тест из front-end-app
 echo -e "${YELLOW}  Тестирование: front-end-app → back-end-api-app${NC}"
-if kubectl exec front-end-app -n "$NAMESPACE" -- wget -qO- --timeout=2 "http://$BACKEND_IP" &> /dev/null; then
+if kubectl exec front-end-app -n "$NAMESPACE" -- curl -s --max-time 2 "http://$BACKEND_IP" &> /dev/null; then
     echo -e "${GREEN}  ✓ Связь есть (ожидаемо, NetworkPolicies ещё не применены)${NC}"
 else
     echo -e "${RED}  ✗ Связи нет (неожиданно, проверьте поды)${NC}"
@@ -180,7 +186,7 @@ echo -e "${BLUE}  admin-back-end-api-app IP: $ADMIN_BACKEND_IP${NC}"
 
 # Тест из front-end-app к admin API (НЕ должен работать после применения политик)
 echo -e "${YELLOW}  Тестирование: front-end-app → admin-back-end-api-app${NC}"
-if kubectl exec front-end-app -n "$NAMESPACE" -- wget -qO- --timeout=2 "http://$ADMIN_BACKEND_IP" &> /dev/null; then
+if kubectl exec front-end-app -n "$NAMESPACE" -- curl -s --max-time 2 "http://$ADMIN_BACKEND_IP" &> /dev/null; then
     echo -e "${GREEN}  ✓ Связь есть (сейчас разрешена, после политик будет запрещена)${NC}"
 else
     echo -e "${RED}  ✗ Связи нет${NC}"

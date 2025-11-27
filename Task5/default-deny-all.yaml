@@ -18,7 +18,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-all-ingress
-  namespace: default
+  namespace: propdevelopment-demo
   labels:
     app: propdevelopment
     policy-type: default-deny
@@ -43,7 +43,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-all-egress
-  namespace: default
+  namespace: propdevelopment-demo
   labels:
     app: propdevelopment
     policy-type: default-deny
